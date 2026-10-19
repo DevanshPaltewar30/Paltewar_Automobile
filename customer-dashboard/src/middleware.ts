@@ -1,34 +1,33 @@
-import { auth } from '@/lib/auth'
+import { withAuth } from 'next-auth/middleware'
 import { NextResponse } from 'next/server'
 
-export default auth((req) => {
-  const { nextUrl } = req
-  const isLoggedIn = !!req.auth
-
-  const isLoginPage = nextUrl.pathname === '/login'
-  const isApiAuthRoute = nextUrl.pathname.startsWith('/api/auth')
-  const isDashboardRoute =
-    nextUrl.pathname.startsWith('/dashboard') ||
-    nextUrl.pathname === '/'
-
-  if (isApiAuthRoute) {
+export default withAuth(
+  function middleware(req) {
     return NextResponse.next()
-  }
+  },
+  {
+    callbacks: {
+      authorized: ({ token, req }) => {
+        const { pathname } = req.nextUrl
 
-  if (isLoginPage) {
-    if (isLoggedIn) {
-      return NextResponse.redirect(new URL('/dashboard', nextUrl))
-    }
-    return NextResponse.next()
-  }
+        // Allow access to login page always
+        if (pathname === '/login') return true
 
-  if (isDashboardRoute && !isLoggedIn) {
-    return NextResponse.redirect(new URL('/login', nextUrl))
-  }
+        // Allow auth API routes
+        if (pathname.startsWith('/api/auth')) return true
 
-  return NextResponse.next()
-})
+        // Require auth for everything else
+        return !!token
+      },
+    },
+    pages: {
+      signIn: '/login',
+    },
+  }
+)
 
 export const config = {
-  matcher: ['/((?!api/auth|_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico).*)',
+  ],
 }
